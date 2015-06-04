@@ -6,7 +6,7 @@ The WebFaction API client is a local client for interfacing to the WebFaction
 web hosting server API.  It provides class-based organization, convenience 
 methods, script execution, and HTML-formatted run reporting.
 
-Can be used as standalone module to execute a supplied script file or as an 
+It can be used as standalone module to execute a supplied script file or as an 
 imported library module within individual script files.
 
 Detailed documentation is available on http://wf-api-client.readthedocs.org/en/latest/.
@@ -15,7 +15,7 @@ Detailed documentation is available on http://wf-api-client.readthedocs.org/en/l
 
 :Contact:   <davidjcox.at@gmail.com>
 
-:Version:   0.1
+:Version:   0.2
 
 Let me know what you think of it...
 
@@ -23,9 +23,9 @@ What's this all about?
 ----------------------
 
 WebFaction provides a perfectly cromulent RESTful API for their server accounts.
-It enables all aspects of server management to be batched remotely: CRUD actions
-for domains, websites, email, databases, etc.  It even allows shell commands.
-Excellent!
+It enables all aspects of server management to be executed remotely: CRUD 
+actions for domains, websites, email, databases, etc.  It even allows shell 
+commands.  Excellent!
 
 This client extends that utility similarly to other IT automation solutions like
 Ansible, Salt, etc, by providing batching, parallelism, and reporting.
@@ -35,15 +35,15 @@ Class-based Organization
 
 Functional groups are implemented as classes with API calls grouped as methods.
 Working with descriptive class instances makes complicated scripting easier, 
-especially when driving more than server or using more than one worker thread.  
-In addition to atomic methods, batched convenience methods have been added, for
-e.g. creating/deleting RFC 2142 email prefixes in one call.
+especially when driving more than one server or using more than one worker 
+thread.  In addition to atomic methods, batched convenience methods have been 
+added, for e.g. creating/deleting RFC 2142 email prefixes in one call.
 
 Convenience Methods
 -------------------
 
 In addition to batch methods, convenience methods are used to speed script 
-execution by performing client-side evaluation to avoid needless remote API 
+execution by performing client-side evaluation to avoid unnecessary remote API 
 calls.  Creation/deletion calls are compared against a single inventory call to 
 ensure that entities exist before attempting deletion or do not exist before 
 attempting creation.  If not, client errors are reported.
@@ -68,14 +68,14 @@ results are color-coded green for 'success' and red for 'failure'.  Elementary!
 Examples
 --------
 
-Standalone module calls are invoked like this:
+Standalone module calls are invoked like this::
 
-    python wfapiclient.py "username" "password" --scriptfile=/home/user/scripts/create_emails --reportfile=/tmp/create_emails.html
+    python `wfapiclient.py` "username" "password" --scriptfile=/home/user/scripts/create_emails --reportfile=/tmp/create_emails.html
 
 
 A standalone script calls methods directly using Python syntax.  The run report 
 is automatically generated for a supplied file name.
-Standalone scripts are structured like this:
+Standalone scripts are structured like this::
 
     """`create_emails` script"""
     email = Email()
@@ -88,7 +88,7 @@ instantiating the Runner class to log results and write out the run report.  It
 is more flexible in that multiple runner objects can be created to work on 
 different servers at one time logging either to separate reports or to one 
 shared report.
-Standalone scripts are structured like this:
+Standalone scripts are structured like this::
 
     """`create_emails` script"""
     import wfapiclient as wf
