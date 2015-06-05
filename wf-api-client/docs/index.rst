@@ -89,7 +89,7 @@ Examples
 
 Standalone module calls are invoked like this::
 
-    python `wfapiclient.py` "username" "password" \
+    python wfapiclient.py "username" "password" \
                             --scriptfile=/home/user/scripts/create_emails \
                             --reportfile=/tmp/create_emails.html
 
