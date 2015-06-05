@@ -28,9 +28,15 @@ Detailed documentation is available on http://wf-api-client.readthedocs.org/en/l
 
 :Contact:   <davidjcox.at@gmail.com>
 
-:Version:   0.2
+:Version:   0.3
 
 Let me know what you think of it...
+
+What's new?
+-----------
+A new day brings full Python 2/3 compatibility!  Whereas the previous versions 
+were only compatible with Python 3, this version supports Python 2 too.  Tutu? 
+Rest assured that the past is the present is the future now.  As it should be.
 
 What's this all about?
 ----------------------
@@ -83,7 +89,9 @@ Examples
 
 Standalone module calls are invoked like this::
 
-    python `wfapiclient.py` "username" "password" --scriptfile=/home/user/scripts/create_emails --reportfile=/tmp/create_emails.html
+    python `wfapiclient.py` "username" "password" \
+                            --scriptfile=/home/user/scripts/create_emails \
+                            --reportfile=/tmp/create_emails.html
 
 
 A standalone script calls methods directly using Python syntax.  The run report 
@@ -91,8 +99,11 @@ is automatically generated for a supplied file name.
 Standalone scripts are structured like this::
 
     """`create_emails` script"""
-    email = Email()
+    
+    #Class object creation requires `self` reference to Runner().
+    email = Email(self)
     email.create_emails(domain="example.com", targets="user@example.com")
+    
     #EOF - `create_emails`
 
 
@@ -104,27 +115,28 @@ shared report.
 Standalone scripts are structured like this::
 
     """`create_emails` script"""
+    
     import wfapiclient as wf
     
-    runner1 = Runner()
-    runner2 = Runner()
+    runner1 = wf.Runner()
+    runner2 = wf.Runner()
     
     #WebFaction automagically identifies target server by username/password.
     runner1.login_to_server("first_username", "first_password")
     runner2.login_to_server("second_username", "second_password")
     
     #Server objects are tied to runner instances for call execution and logging.
-    email1 = Email(runner1)
+    email1 = wf.Email(runner1)
     email1.create_emails(domain="first.example.com", targets="user1@first.example.com")
     
-    email2 = Email(runner2)
+    email2 = wf.Email(runner2)
     email2.create_emails(domain="second.example.com", targets="user2@second.example.com")
     
     #Either write report to separate report files...
     runner1.write_report_to_file("/tmp/create_emails1.html")
     runner2.write_report_to_file("/tmp/create_emails2.html")
     
-    #...or write (append) reports to one shared file.
+    #...or write (append) reports to one `shared` file.
     runner1.write_report_to_file("/tmp/create_emails_shared.html")
     runner2.write_report_to_file("/tmp/create_emails_shared.html")
     
@@ -144,7 +156,7 @@ Send questions, suggestions, comments to <davidjcox.at@gmail.com>.
 
 Let me know if you're successfully using wf-api-client for your project.
 
-Build good things.
+`Build good things.`
 
 
 Search
