@@ -105,6 +105,7 @@ def concatenate_list_to_string(_list):
     Collapses a list of strings into one string of comma-separated items.
     """
     _string = BLANK_STR
+    _list = [text_type(_item) for _item in _list]
     _string = COMMA_SEP.join(_list)
     return _string
 #/concatenate_list_to_string
@@ -623,28 +624,28 @@ class Cron(object):
     #/__init__
     
     
-    def create_cron_job(self,
+    def create_cronjob(self,
                         line=BLANK_STR):
         
         CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
-        _arguments = get_arguments(self.create_cron_job, locals())
+        _arguments = get_arguments(self.create_cronjob, locals())
         
         self._runner.try_api_call(CALLER,
-                                  self._server.create_cron_job,
+                                  self._server.create_cronjob,
                                   _arguments)
-    #/create_cron_job
+    #/create_cronjob
     
     
-    def delete_cron_job(self,
+    def delete_cronjob(self,
                         line=BLANK_STR):
         
         CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
-        _arguments = get_arguments(self.delete_cron_job, locals())
+        _arguments = get_arguments(self.delete_cronjob, locals())
         
         self._runner.try_api_call(CALLER,
-                                  self._server.delete_cron_job,
+                                  self._server.delete_cronjob,
                                   _arguments)
-    #/delete_cron_job
+    #/delete_cronjob
 
 #/Cron
 
@@ -1012,7 +1013,7 @@ class ShellUser(object):
         _shell_user = {u('username'): username}
         
         if already_exists(_shell_user, _existing_shellusers):
-            _arguments = get_arguments(self.system, locals())
+            _arguments = get_arguments(self.change_user_password, locals())
             self._runner.try_api_call(CALLER,
                                       self._server.change_user_password,
                                       _arguments)
@@ -1113,7 +1114,7 @@ class Runner(object):
         """
         Logs individual execution result for a server call.
         """
-        _result = u(" | ").join([[text_type(datetime.now()), _caller, [_result]])
+        _result = [text_type(datetime.now()) + u(" | ") + _caller + u(" | ")] + [_result]
         self._run_results[_key].append(_result)
     #/log
     
@@ -1124,7 +1125,7 @@ class Runner(object):
         """
         
         try:
-            _result = _api_call(*_args)
+            _result = _api_call(self._session_id, *_args)
         except TypeError as error:
             self.log(_caller, FAILURE, _error)
         except _xmlrpc.Fault as fault:
@@ -1137,7 +1138,7 @@ class Runner(object):
                                       u(text_type(error.errmsg))])
             self.log(_caller, FAILURE, _error)
         else: #try succeeded
-            self._runner.log(_caller, SUCCESS, _result)
+            self.log(_caller, SUCCESS, _result)
     #/try_api_call
     
     
