@@ -8,16 +8,26 @@ import sys
 import argparse
 import wfapiclient as wf
 
+
 if sys.version_info < (3,):
     #define python2-compatible string function
     import codecs
     def u(x):
         return codecs.unicode_escape_decode(x)[0]
+    
+    #define python2-compatible string comparators
+    text_type = unicode
+    binary_type = str
 else:
     #define python3-compatible string function
     def u(x):
         return x
-#/compatible string function
+    
+    #define python3-compatible string comparators
+    text_type = str
+    binary_type = bytes
+#/python version checks
+
 
 BLANK_STR = u("")
 
@@ -35,6 +45,16 @@ def run_tests():
     runner1 = wf.Runner()
     
     runner1.login_to_server(args.username, args.password)
+    
+    
+    #Server tests
+    server1 = wf.Server(runner1)
+    
+    server_ips = server1.list_ips()
+    print(server_ips)
+    server_machines = server1.list_machines()
+    print(server_machines)
+    #/Server tests
     
     
     #Domain CREATE tests
@@ -80,16 +100,18 @@ def run_tests():
     #Website CREATE/UPDATE tests
     website1 = wf.Website(runner1)
     
+    webserver_ip = server_ips[0]['ip'] #`server_ips` from `Server tests` above.
+    
     website1.list_bandwidth_usage()
     website1.list_websites()
     website1.create_website(website_name=u("Test Website Entry"),
-                            ip=u("192.0.2.1"),
+                            ip=u(webserver_ip),
                             https=True,
                             subdomains=[u("test.example")],
                             site_apps=[u("test_static_application"), u("/")])
     website1.list_websites()
     website1.update_website(website_name=u("Test Website Entry"),
-                            ip=u("192.0.2.2"),
+                            ip=u(webserver_ip),
                             https=False,
                             subdomains=[u("test.example")],
                             site_apps=[u("test_static_application"), u("/")])
@@ -171,23 +193,23 @@ def run_tests():
                            db_type=u("postgresql"),
                            addon=u("postgis"))
     database1.list_db_users()
-    database1.create_db_user(username=u("test_postgresql_db_ADMIN_user"),
+    database1.create_db_user(username=u("pgsqlAdmin"),
                              password=u("test_postgresql_db_user_password"),
                              db_type=u("postgresql"))
     database1.list_db_users()
-    database1.change_db_user_password(username=u("test_postgresql_db_ADMIN_user"),
-                                      password=u("test_postgresql_db_user_password_1"),
+    database1.change_db_user_password(username=u("pgsqlAdmin"),
+                                      password=u("test_postgresql_db_user_password_new"),
                                       db_type=u("postgresql"))
-    database1.make_user_owner_of_db(username=u("test_postgresql_db_ADMIN_user"),
+    database1.make_user_owner_of_db(username=u("pgsqlAdmin"),
                                     database=u("test_postgresql_db"),
                                     db_type=u("postgresql"))
-    database1.create_db_user(username=u("test_postgresql_db_POWERUSER_user"),
-                             password=u("test_postgresql_db_user_password_2"),
+    database1.create_db_user(username=u("pgsqlUser"),
+                             password=u("test_postgresql_db_user_password"),
                              db_type=u("postgresql"))
-    database1.grant_db_permissions(username=u("test_postgresql_db_POWERUSER_user"),
+    database1.grant_db_permissions(username=u("pgsqlUser"),
                                    database=u("test_postgresql_db"),
                                    db_type=u("postgresql"))
-    database1.revoke_db_permissions(username=u("test_postgresql_db_POWERUSER_user"),
+    database1.revoke_db_permissions(username=u("pgsqlUser"),
                                     database=u("test_postgresql_db"),
                                     db_type=u("postgresql"))
     #/Database tests
@@ -205,13 +227,13 @@ def run_tests():
     shelluser1 = wf.ShellUser(runner1)
 
     shelluser1.list_users()
-    shelluser1.create_user(username=u("test_shelluser"),
+    shelluser1.create_user(username=u("shelluser"),
                            shell=u("bash"),
                            groups=[])
     shelluser1.list_users()
-    shelluser1.change_user_password(username=u("test_shelluser"),
+    shelluser1.change_user_password(username=u("shelluser"),
                                     password=u("test_shelluser_password"))
-    shelluser1.delete_user(username=u("test_shelluser"))
+    shelluser1.delete_user(username=u("shelluser"))
     shelluser1.list_users()
     #/ShellUser tests
     
@@ -223,8 +245,8 @@ def run_tests():
     *       *       *       *       *       /sbin/ping -c 1 127.0.0.1 > /dev/null
     """)
     
-    cron1.create_cron_job(line=CRONTABLINE)
-    cron1.delete_cron_job(line=CRONTABLINE)
+    cron1.create_cronjob(line=CRONTABLINE)
+    cron1.delete_cronjob(line=CRONTABLINE)
     #/Cron tests
     
     
@@ -255,9 +277,9 @@ def run_tests():
     
     
     #Database DELETE tests
-    database1.delete_db_user(username=u("test_postgresql_db_POWERUSER_user"),
+    database1.delete_db_user(username=u("pgsqlUser"),
                              db_type=u("postgresql"))
-    database1.delete_db_user(username=u("test_postgresql_db_ADMIN_user"),
+    database1.delete_db_user(username=u("pgsqlAdmin"),
                              db_type=u("postgresql"))
     database1.list_db_users()
     database1.delete_db(name=u("test_postgresql_db"),
