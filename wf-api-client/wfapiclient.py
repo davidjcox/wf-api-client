@@ -19,35 +19,46 @@ import sys
 import os.path
 import inspect
 import argparse
-import collections.abc
 from io import open
 from datetime import datetime
 from collections import OrderedDict
-   
 
 if sys.version_info < (3,):
-    #import compatible xmlrpc library
+    #Import compatible xmlrpc library.
     import xmlrpclib as _xmlrpc
     
-    #define python2-compatible string function
+    #Import python2-compatible collections Iterable.
+    from collections import Iterable as _Iterable
+    
+    #Define python2-compatible string function.
     import codecs
     def u(x):
         return codecs.unicode_escape_decode(x)[0]
     
-    #define python2-compatible string comparators
+    #Define python2-compatible string comparators.
     text_type = unicode
     binary_type = str
+    
+    def get_frame_name(_frame):
+        return inspect.getframeinfo(_frame)[0].upper()
+    
 else:
-    #import compatible xmlrpc library
+    #Import python3-compatible xmlrpc library.
     import xmlrpc.client as _xmlrpc
     
-    #define python3-compatible string function
+    #Import python3-compatible collections Iterable.
+    from collections.abc import Iterable as _Iterable
+    
+    #Define python3-compatible string function.
     def u(x):
         return x
     
-    #define python3-compatible string comparators
+    #Define python3-compatible string comparators.
     text_type = str
     binary_type = bytes
+    
+    def get_frame_name(_frame):
+        return inspect.getframeinfo(_frame).function.upper()
 #/python version checks
 
 
@@ -81,14 +92,26 @@ HTML_END = u("""
 
 
 
-def get_arguments(function, parameters, inspect=inspect):
+def get_arguments(_function, _parameters, inspect=inspect):
     """
     Inspects the calling signature of the passed `function` and retrieves the 
     corresponding `argument` for each parameter in its `parameters`.
     """
-    return [parameters[argument] 
-            for argument in inspect.signature(function).parameters 
-            if argument in parameters]
+    # return [parameters[argument] 
+            # for argument in inspect.signature(function).parameters 
+            # if argument in parameters]
+    
+    _arguments = []
+    
+    for _argument in inspect.signature(_function).parameters:
+        if _argument in _parameters: #if _argument belongs to API function call...
+            _arg_value = _parameters[_argument] #get the value, and...
+            if isinstance(_arg_value, text_type): #if unicode or str type...
+                _arguments.append(u(_arg_value)) #cast to version-compatible string and append.
+            else:
+                _arguments.append(_arg_value) #otherwise, just append unaltered value.
+    
+    return _arguments
 #/get_arguments
 
 
@@ -112,40 +135,43 @@ def concatenate_list_to_string(_list):
 
 
 def flatten_iterable(iterable,
-                     split_word=False,
                      string_sep=None,
-                     iterable_type=collections.abc.Iterable):
+                     split_word=False,
+                     iterable_type=_Iterable):
     """
     Flattens any iterable type, other than a file, into a sequence of items. 
-    Must be called by casting to a container type, e.g.:
-        `list_sequence = list(flatten_iterable(collection))`
+    Must be called by casting to a container type, e.g.,
+        `list_sequence = list(flatten_iterable(collection))`.
     Strings can be further manipulated by providing a string separator to split
-    strings, or by providing a split word directive to continue splitting words 
+    lines, or by providing a split word directive to continue splitting words 
     down to letters.
     """
     if isinstance(iterable, dict): #Dictionary.
         for _value in iterable.values(): #Iterate values, not keys.
             if isinstance(_value, iterable_type):
                 for _item in flatten_iterable(_value,
+                                               string_sep=string_sep,
                                                split_word=split_word,
-                                               string_sep=string_sep, 
                                                iterable_type=iterable_type):
                     yield _item #Return next iterable item.
             else:
                 yield _value #Return next dictionary value.
     elif isinstance(iterable, text_type): #String.
-        for _word in iterable.split(string_sep): #Split strings into words.
-            if split_word: #Optionally, split word into letters.
-                for _letter in _word:
-                    yield _letter #Return next letter.
-            else:
-                yield _word #Return next word.
+        if string_sep is not None: #Optionally, split lines into words.
+            for _word in iterable.split(string_sep):
+                if split_word: #Optionally, split word into letters.
+                    for _letter in _word:
+                        yield _letter #Return next letter.
+                else:
+                    yield _word #Return next word.
+        else:
+            yield iterable # Return next line.
     elif isinstance(iterable, iterable_type): #List, tuple, or set.
         for _item in iterable:
             if isinstance(_item, iterable_type):
                 for _subitem in flatten_iterable(_item,
-                                                  split_word=split_word, 
                                                   string_sep=string_sep,
+                                                  split_word=split_word, 
                                                   iterable_type=iterable_type):
                     yield _subitem #Return next iterable item.
             else:
@@ -193,7 +219,7 @@ class Mailbox(object):
                        use_manual_procmailrc=False,
                        manual_procmailrc=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create Mailbox '{}' that already exists."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
@@ -211,7 +237,7 @@ class Mailbox(object):
     def delete_mailbox(self,
                        mailbox=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' Mailbox."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
@@ -234,7 +260,7 @@ class Mailbox(object):
                        use_manual_procmailrc=False,
                        manual_procmailrc=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't update non-existent '{}' Mailbox."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
@@ -253,7 +279,7 @@ class Mailbox(object):
                                 mailbox=BLANK_STR,
                                 password=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't change password for non-existent '{}' mailbox."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
@@ -286,7 +312,7 @@ class Email(object):
     
     def create_email(self,
                      email_address=BLANK_STR,
-                     targets=BLANK_STR,
+                     targets=[],
                      autoresponder_on=False,
                      autoresponder_subject = BLANK_STR,
                      autoresponder_message=BLANK_STR,
@@ -294,13 +320,14 @@ class Email(object):
                      script_machine=BLANK_STR,
                      script_path=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create mail address '{}' that already exists."
         _existing_email_addresses = self.list_emails()
         _email_address = {u('email_address'): email_address}
         
         if not already_exists(_email_address, _existing_email_addresses):
             _arguments = get_arguments(self.create_email, locals())
+            _arguments[1] = u(", ").join(_arguments[1])
             self._runner.try_api_call(CALLER,
                                       self._server.create_email,
                                       _arguments)
@@ -340,7 +367,7 @@ class Email(object):
     def delete_email(self,
                      email_address=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' email address."
         _existing_email_addresses = self.list_emails()
         _email_address = {u('email_address'): email_address}
@@ -392,13 +419,14 @@ class Email(object):
                      script_machine=BLANK_STR,
                      script_path=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't update non-existent '{}' email address."
         _existing_email_addresses = self.list_emails()
         _email_address = {u('email_address'): email_address}
         
         if already_exists(_email_address, _existing_email_addresses):
             _arguments = get_arguments(self.update_email, locals())
+            _arguments[1] = u(", ").join(_arguments[1])
             self._runner.try_api_call(CALLER,
                                       self._server.update_email,
                                       _arguments)
@@ -427,21 +455,15 @@ class Domain(object):
                       domain=BLANK_STR,
                       subdomain=[]):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
-        _msg = "Can't create domain '{0}' or subdomain '{1}' that already exists."
-        _existing_domains = self.list_domains()
-        _full_domain_name = {u('domain'): domain, u('subdomain'): subdomain}
+        CALLER = get_frame_name(inspect.currentframe())
         
-        if not already_exists(_full_domain_name, _existing_domains):
-            _arguments = get_arguments(self.create_domain, locals())
-            _subdomains = _arguments.pop(-1)
-            for _subdomain in _subdomains:
-                _arguments.append(_subdomain)
-            self._runner.try_api_call(CALLER,
-                                      self._server.create_domain,
-                                      _arguments)
-        else: #_full_domain_name already in _existing_domains
-            self._runner.log(CALLER, FAILURE, u(_msg).format(domain, subdomain))
+        _arguments = get_arguments(self.create_domain, locals())
+        _subdomains = _arguments.pop(-1)
+        for _subdomain in _subdomains:
+            _arguments.append(_subdomain)
+        self._runner.try_api_call(CALLER,
+                                  self._server.create_domain,
+                                  _arguments)
     #/create_domain
     
     
@@ -449,21 +471,15 @@ class Domain(object):
                       domain=BLANK_STR,
                       subdomain=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
-        _msg = "Can't delete non-existent '{0}' domain or '{1}' subdomain."
-        _existing_domains = self.list_domains()
-        _full_domain_name = {u('domain'): domain, u('subdomain'): subdomain}
+        CALLER = get_frame_name(inspect.currentframe())
         
-        if already_exists(_full_domain_name, _existing_domains):
-            _arguments = get_arguments(self.delete_domain, locals())
-            _subdomains = _arguments.pop(-1)
-            for _subdomain in _subdomains:
-                _arguments.append(_subdomain)
-            self._runner.try_api_call(CALLER,
-                                      self._server.delete_domain,
-                                      _arguments)
-        else: #_full_domain_name not already in _existing_domains
-            self._runner.log(CALLER, FAILURE, u(_msg).format(domain, subdomain))
+        _arguments = get_arguments(self.delete_domain, locals())
+        _subdomains = _arguments.pop(-1)
+        for _subdomain in _subdomains:
+            _arguments.append(_subdomain)
+        self._runner.try_api_call(CALLER,
+                                  self._server.delete_domain,
+                                  _arguments)
     #/delete_domain
 
 #/Domain
@@ -495,7 +511,7 @@ class Website(object):
                        subdomains=[],
                        site_apps=[]):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create website '{}' that already exists."
         _existing_websites = self.list_websites()
         _website_name = {u('website_name'): website_name}
@@ -515,7 +531,7 @@ class Website(object):
                        ip=BLANK_STR,
                        https=False):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' website."
         _existing_websites = self.list_websites()
         _website_name = {u('website_name'): website_name}
@@ -537,7 +553,7 @@ class Website(object):
                        subdomains=[],
                        site_apps=[]):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't update non-existent '{}' website."
         _existing_websites = self.list_websites()
         _website_name = {u('website_name'): website_name}
@@ -580,7 +596,7 @@ class Application(object):
                    extra_info=BLANK_STR,
                    open_port=False):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create application '{}' that already exists."
         _existing_apps = self.list_apps()
         _app_name = {u('name'): name}
@@ -598,7 +614,7 @@ class Application(object):
     def delete_app(self,
                    name=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' application."
         _existing_apps = self.list_apps()
         _app_name = {u('name'): name}
@@ -627,7 +643,7 @@ class Cron(object):
     def create_cronjob(self,
                         line=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _arguments = get_arguments(self.create_cronjob, locals())
         
         self._runner.try_api_call(CALLER,
@@ -639,7 +655,7 @@ class Cron(object):
     def delete_cronjob(self,
                         line=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _arguments = get_arguments(self.delete_cronjob, locals())
         
         self._runner.try_api_call(CALLER,
@@ -673,18 +689,12 @@ class DNS(object):
                             spf_record=BLANK_STR,
                             aaaa_ip=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
-        _msg = "Can't create DNS override '{}' that already exists."
-        _existing_dns_overrides = self.list_dns_overrides()
-        _domain = {u('domain'): domain}
+        CALLER = get_frame_name(inspect.currentframe())
         
-        if not already_exists(_domain, _existing_dns_overrides):
-            _arguments = get_arguments(self.create_dns_override, locals())
-            self._runner.try_api_call(CALLER,
-                                      self._server.create_dns_override,
-                                      _arguments)
-        else: #_domain already in _existing_dns_overrides
-            self._runner.log(CALLER, FAILURE, u(_msg).format(domain))
+        _arguments = get_arguments(self.create_dns_override, locals())
+        self._runner.try_api_call(CALLER,
+                                  self._server.create_dns_override,
+                                  _arguments)
     #/create_dns_override
     
     
@@ -697,18 +707,12 @@ class DNS(object):
                             spf_record=BLANK_STR,
                             aaaa_ip=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
-        _msg = "Can't delete non-existent '{}' DNS override."
-        _existing_dns_overrides = self.list_dns_overrides()
-        _domain = {u('domain'): domain}
+        CALLER = get_frame_name(inspect.currentframe())
         
-        if already_exists(_domain, _existing_dns_overrides):
-            _arguments = get_arguments(self.delete_dns_override, locals())
-            self._runner.try_api_call(CALLER,
-                                      self._server.delete_dns_override,
-                                      _arguments)
-        else: #domain not already in _existing_dns_overrides
-            self._runner.log(CALLER, FAILURE, u(_msg).format(domain))
+        _arguments = get_arguments(self.delete_dns_override, locals())
+        self._runner.try_api_call(CALLER,
+                                  self._server.delete_dns_override,
+                                  _arguments)
     #/delete_dns_override
     
 #/DNS
@@ -738,7 +742,7 @@ class Database(object):
                   db_type=u("postgresql"),
                   password=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create database '{}' that already exists."
         _existing_databases = self.list_dbs()
         _db_name = {u('name'): name}
@@ -757,7 +761,7 @@ class Database(object):
                   name=BLANK_STR,
                   db_type=u("postgresql")):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' database."
         _existing_databases = self.list_dbs()
         _db_name = {u('name'): name}
@@ -777,7 +781,7 @@ class Database(object):
                        password=BLANK_STR,
                        db_type=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create database user '{}' that already exists."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
@@ -796,7 +800,7 @@ class Database(object):
                        username=BLANK_STR,
                        db_type=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
@@ -816,7 +820,7 @@ class Database(object):
                                 password=BLANK_STR,
                                 db_type=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't change password for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
@@ -836,7 +840,7 @@ class Database(object):
                               database=BLANK_STR,
                               db_type=u("postgresql")):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't change password for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
@@ -856,7 +860,7 @@ class Database(object):
                              database=BLANK_STR,
                              db_type=u("postgresql")):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't grant permission for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
@@ -876,7 +880,7 @@ class Database(object):
                               database=BLANK_STR,
                               db_type=u("postgresql")):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't revoke permission for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
@@ -896,7 +900,7 @@ class Database(object):
                      db_type=u("postgresql"),
                      addon=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't enable addon for non-existent '{}' database."
         _existing_databases = self.list_dbs()
         _database = {u('database'): database}
@@ -926,7 +930,7 @@ class File(object):
                         filename=BLANK_STR,
                         changes=[]):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _arguments = get_arguments(self.replace_in_file, locals())
         
         self._runner.try_api_call(CALLER,
@@ -940,7 +944,7 @@ class File(object):
                    str=BLANK_STR,
                    mode=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _arguments = get_arguments(self.write_file, locals())
         
         self._runner.try_api_call(CALLER,
@@ -970,7 +974,7 @@ class ShellUser(object):
                     shell=BLANK_STR,
                     groups=[]):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't create already existing '{}' shell user."
         _existing_shellusers = self.list_users()
         _shell_user = {u('username'): username}
@@ -988,7 +992,7 @@ class ShellUser(object):
     def delete_user(self,
                     username=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't delete non-existent '{}' shell user."
         _existing_shellusers = self.list_users()
         _shell_user = {u('username'): username}
@@ -1007,7 +1011,7 @@ class ShellUser(object):
                              username=BLANK_STR,
                              password=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _msg = "Can't change password for non-existent '{}' shell user."
         _existing_shellusers = self.list_users()
         _shell_user = {u('username'): username}
@@ -1057,7 +1061,7 @@ class System(object):
     def system(self,
                cmd=BLANK_STR):
         
-        CALLER = inspect.getframeinfo(inspect.currentframe()).function.upper()
+        CALLER = get_frame_name(inspect.currentframe())
         _arguments = get_arguments(self.system, locals())
         
         self._runner.try_api_call(CALLER,
@@ -1106,7 +1110,9 @@ class Runner(object):
         self._session_id, self._account = self._server.login(_username,
                                                               _password)
         
-        print(self._account)
+        print(u(" Logged in to server '{0}' as user '{1}'.").format(
+                                                    self._account['web_server'],
+                                                    self._account['username']))
     #/login_to_server
     
     
@@ -1114,7 +1120,7 @@ class Runner(object):
         """
         Logs individual execution result for a server call.
         """
-        _result = [text_type(datetime.now()) + u(" | ") + _caller + u(" | ")] + [_result]
+        _result = [text_type(datetime.now()) + u(" | ") + u(_caller) + u(" | ")] + [_result]
         self._run_results[_key].append(_result)
     #/log
     
@@ -1142,13 +1148,13 @@ class Runner(object):
     #/try_api_call
     
     
-    def process_results(self, _results):
+    def process_results(self):
         """
         Processes a dictionary of execution result lists into string 
         representations wrapped in the HTML needed to create <li> nodes.
         """
         _html = "      "
-        for result_type, results_list in _results.items():
+        for result_type, results_list in self._run_results.items():
             for result_list in results_list:
                 _li = BLANK_STR
                 for result in result_list:
@@ -1174,7 +1180,7 @@ class Runner(object):
         """
         global HTML_START, HTML_END
         
-        html_report = self.process_results(self._run_results)
+        html_report = self.process_results()
         return HTML_START + html_report + HTML_END
     #/report
     
