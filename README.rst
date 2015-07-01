@@ -15,15 +15,15 @@ Detailed documentation is available on http://wf-api-client.readthedocs.org/en/l
 
 :Contact:   <davidjcox.at@gmail.com>
 
-:Version:   0.3
+:Version:   1.0
 
 Let me know what you think of it...
 
 What's new?
 -----------
-A new day brings full Python 2/3 compatibility!  Whereas the previous versions 
-were only compatible with Python 3, this version supports Python 2 too.  Tutu? 
-Rest assured that the past is the present is the future now.  As it should be.
+The client continues to be Python 2/3 compatible, as it should be.  A full test 
+suite has been added, which also doubles as an example of how to write a 
+standalone script for the client.
 
 What's this all about?
 ----------------------
@@ -33,8 +33,24 @@ It enables all aspects of server management to be executed remotely: CRUD
 actions for domains, websites, email, databases, etc.  It even allows shell 
 commands.  Excellent!
 
-This client extends that utility similarly to other IT automation solutions like
-Ansible, Salt, etc, by providing batching, parallelism, and reporting.
+However, despite its excellence, there are a few design decisions that cause 
+misgivings for me:
+- The WebFaction API uses positional arguments.  
+    When working with remote servers, I prefer commands to be as explicit as 
+    possible, because like Unix, APIs can be unforgiving.  This client uses 
+    keyword arguments to guard against a slip of concentration wiping something 
+    important out.  It translates the keyword arguments into positional ones 
+    for each API call.
+- The WebFaction API has small inconsistencies in calling convention.
+    This is a nitpick, but one that's important when remotely administering 
+    servers.  Some API calls define collections using lists.  Others define 
+    collections using positional arguments only.  Once again, a mistake waiting 
+    to be made if a call signature is recalled incorrectly.  This client uses 
+    lists for all collections and unwraps the appropriate ones back into 
+    individual positional arguments for those API calls that require it.
+In addition to these translation functions, the WebFaction API client provides 
+additional utility similar to other IT automation solutions like Ansible, Salt, 
+etc, by providing batching, parallelism, and reporting, described as follows.
 
 Class-based Organization
 ------------------------
@@ -71,19 +87,32 @@ status, datetime, API call name, and call result to a log function.  The running
 tally of logged actions are collected and reported as a HTMl report file.  Call 
 results are color-coded green for 'success' and red for 'failure'.  Elementary!
 
+Tests
+-----
+
+A full test suite is provided in the `wfapiclienttests.py` file.  It is 
+standalone script and, so, doubles as a fine example for standalone scripts. The 
+tests must be run against a live, accessible WeFaction server using valid 
+credentials.  The tests are not idempotent but can be considered nearly so in
+that all test actions against the server will not cause side effects for the 
+existing configuration and all test create and update actions are deleted 
+afterward.  Should some event prevent successful completion of the tests, all 
+test objects created on the server are obviously identifiable with some 
+variation of 'wf_test' pre-pended to their name and should be considered safe 
+to delete manually.
+
+
 Examples
 --------
 
-Standalone module calls are invoked like this::
+Tests are executed like so::
 
-    python wfapiclient.py "username" "password" \
-                        --scriptfile=/home/user/scripts/create_emails \
-                        --reportfile=/tmp/create_emails.html
+    python wfapiclienttests.py "username" "password" "/path/to/report.html"
 
 
-A standalone script calls methods directly using Python syntax.  The run report 
-is automatically generated for a supplied file name.
-Standalone scripts are structured like this::
+Scripts for importation by the module call methods directly using Python syntax.
+The run report is automatically generated using a supplied destination file name.
+Imported scripts are structured like this::
 
     """`create_emails` script"""
     
@@ -130,4 +159,11 @@ Standalone scripts are structured like this::
     #EOF - `create_emails`
 
 
-Enjoy.
+Direct module calls are invoked like this::
+
+    python wfapiclient.py "username" "password" \
+                            --scriptfile=/home/user/scripts/create_emails \
+                            --reportfile=/tmp/create_emails.html
+
+
+That's it.  Have fun.
