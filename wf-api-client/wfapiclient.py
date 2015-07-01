@@ -37,11 +37,7 @@ if sys.version_info < (3,):
     
     #Define python2-compatible string comparators.
     text_type = unicode
-    binary_type = str
-    
-    def get_frame_name(_frame):
-        return inspect.getframeinfo(_frame)[0].upper()
-    
+    binary_type = str    
 else:
     #Import python3-compatible xmlrpc library.
     import xmlrpc.client as _xmlrpc
@@ -56,9 +52,6 @@ else:
     #Define python3-compatible string comparators.
     text_type = str
     binary_type = bytes
-    
-    def get_frame_name(_frame):
-        return inspect.getframeinfo(_frame).function.upper()
 #/python version checks
 
 
@@ -92,44 +85,50 @@ HTML_END = u("""
 
 
 
-def get_arguments(_function, _parameters, inspect=inspect):
+def get_frame_name(_frame):
+    return inspect.getframeinfo(_frame).function.upper()
+#/get_frame_name
+
+
+def get_arguments(_frame, inspect=inspect):
     """
     Inspects the calling signature of the passed `function` and retrieves the 
     corresponding `argument` for each parameter in its `parameters`.
     """
-    # return [parameters[argument] 
-            # for argument in inspect.signature(function).parameters 
-            # if argument in parameters]
-    
     _arguments = []
     
-    for _argument in inspect.signature(_function).parameters:
-        if _argument in _parameters: #if _argument belongs to API function call...
-            _arg_value = _parameters[_argument] #get the value, and...
-            if isinstance(_arg_value, text_type): #if unicode or str type...
-                _arguments.append(u(_arg_value)) #cast to version-compatible string and append.
-            else:
-                _arguments.append(_arg_value) #otherwise, just append unaltered value.
+    _frame_information = inspect.getargvalues(_frame)
+    _parameters = _frame_information[0][1:]
+    _signature = _frame_information[3]
+    
+    for _parameter in _parameters:
+        _argument = _signature[_parameter]
+        if isinstance(_argument, text_type):
+            _arguments.append(u(_argument))
+        else:
+            _arguments.append(_argument)
     
     return _arguments
 #/get_arguments
 
 
-def enquote(_string):
+def enquote(string):
     """
     Wraps string in single-quotes.
     """
-    return u("'") + _string + u("'")
+    return u("'") + string + u("'")
 #/enquote
 
 
-def concatenate_list_to_string(_list):
+def concatenate_list_to_string(list):
     """
     Collapses a list of strings into one string of comma-separated items.
     """
     _string = BLANK_STR
-    _list = [text_type(_item) for _item in _list]
-    _string = COMMA_SEP.join(_list)
+    
+    list = [text_type(_item) for _item in list]
+    _string = COMMA_SEP.join(list)
+    
     return _string
 #/concatenate_list_to_string
 
@@ -152,7 +151,7 @@ def flatten_iterable(iterable,
                 for _item in flatten_iterable(_value,
                                                string_sep=string_sep,
                                                split_word=split_word,
-                                               iterable_type=iterable_type):
+                                               iterable_type=_Iterable):
                     yield _item #Return next iterable item.
             else:
                 yield _value #Return next dictionary value.
@@ -166,13 +165,15 @@ def flatten_iterable(iterable,
                     yield _word #Return next word.
         else:
             yield iterable # Return next line.
-    elif isinstance(iterable, iterable_type): #List, tuple, or set.
+    elif (isinstance(iterable, list) or
+          isinstance(iterable, tuple) or
+          isinstance(iterable, set)): #List, tuple, or set.
         for _item in iterable:
             if isinstance(_item, iterable_type):
                 for _subitem in flatten_iterable(_item,
                                                   string_sep=string_sep,
-                                                  split_word=split_word, 
-                                                  iterable_type=iterable_type):
+                                                  split_word=split_word,
+                                                  iterable_type=_Iterable):
                     yield _subitem #Return next iterable item.
             else:
                 yield _item #String, most likely.
@@ -188,6 +189,7 @@ def already_exists(candidate, returned_api_collection):
     dictionaries returned by an API list call.
     """
     _exists = []
+    
     for _dictionary in returned_api_collection:
         _subgroup = set(flatten_iterable(candidate))
         _group = set(flatten_iterable(_dictionary))
@@ -219,36 +221,38 @@ class Mailbox(object):
                        use_manual_procmailrc=False,
                        manual_procmailrc=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create Mailbox '{}' that already exists."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
         
         if not already_exists(_mailbox, _existing_mailboxes):
-            _arguments = get_arguments(self.create_mailbox, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_mailbox,
                                       _arguments)
         else: #_mailbox already in _existing_mailboxes
-            self._runner.log(CALLER, FAILURE, u(_msg).format(mailbox))
+            self._runner.log(_caller, FAILURE, u(_msg).format(mailbox))
     #/create_mailbox
     
     
     def delete_mailbox(self,
                        mailbox=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' Mailbox."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
         
         if already_exists(_mailbox, _existing_mailboxes):
-            _arguments = get_arguments(self.delete_mailbox, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_mailbox,
                                       _arguments)
         else: #_mailbox not already in _existing_mailboxes
-            self._runner.log(CALLER, FAILURE, u(_msg).format(mailbox))
+            self._runner.log(_caller, FAILURE, u(_msg).format(mailbox))
     #/delete_mailbox
     
     
@@ -260,18 +264,19 @@ class Mailbox(object):
                        use_manual_procmailrc=False,
                        manual_procmailrc=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't update non-existent '{}' Mailbox."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
         
         if already_exists(_mailbox, _existing_mailboxes):
-            _arguments = get_arguments(self.update_mailbox, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.update_mailbox,
                                       _arguments)
         else: #_mailbox not already in _existing_mailboxes
-            self._runner.log(CALLER, FAILURE, u(_msg).format(mailbox))
+            self._runner.log(_caller, FAILURE, u(_msg).format(mailbox))
     #/update_mailbox
     
     
@@ -279,18 +284,19 @@ class Mailbox(object):
                                 mailbox=BLANK_STR,
                                 password=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't change password for non-existent '{}' mailbox."
         _existing_mailboxes = self.list_mailboxes()
         _mailbox = {u('mailbox'): mailbox}
         
         if already_exists(_mailbox, _existing_mailboxes):
-            _arguments = get_arguments(self.change_mailbox_password, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.change_mailbox_password,
                                       _arguments)
         else: #_mailbox not already in _existing_mailboxes
-            self._runner.log(CALLER, FAILURE, u(_msg).format(mailbox))
+            self._runner.log(_caller, FAILURE, u(_msg).format(mailbox))
     #/change_mailbox_password
 
 #/Mailbox
@@ -320,19 +326,20 @@ class Email(object):
                      script_machine=BLANK_STR,
                      script_path=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create mail address '{}' that already exists."
         _existing_email_addresses = self.list_emails()
         _email_address = {u('email_address'): email_address}
         
         if not already_exists(_email_address, _existing_email_addresses):
-            _arguments = get_arguments(self.create_email, locals())
             _arguments[1] = u(", ").join(_arguments[1])
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_email,
                                       _arguments)
         else: #_email_address already in _existing_email_addresses
-            self._runner.log(CALLER, FAILURE, u(_msg).format(email_address))
+            self._runner.log(_caller, FAILURE, u(_msg).format(email_address))
     #/create_email
     
     
@@ -367,18 +374,19 @@ class Email(object):
     def delete_email(self,
                      email_address=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' email address."
         _existing_email_addresses = self.list_emails()
         _email_address = {u('email_address'): email_address}
         
         if already_exists(_email_address, _existing_email_addresses):
-            _arguments = get_arguments(self.delete_email, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_email,
                                       _arguments)
         else: #_email_address not already in _existing_email_addresses
-            self._runner.log(CALLER, FAILURE, u(_msg).format(email_address))
+            self._runner.log(_caller, FAILURE, u(_msg).format(email_address))
     #/delete_email
     
     
@@ -419,19 +427,20 @@ class Email(object):
                      script_machine=BLANK_STR,
                      script_path=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
+        _arguments[1] = u(", ").join(_arguments[1])
         _msg = "Can't update non-existent '{}' email address."
         _existing_email_addresses = self.list_emails()
         _email_address = {u('email_address'): email_address}
         
         if already_exists(_email_address, _existing_email_addresses):
-            _arguments = get_arguments(self.update_email, locals())
-            _arguments[1] = u(", ").join(_arguments[1])
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.update_email,
                                       _arguments)
         else: #_email_address not already in _existing_email_addresses
-            self._runner.log(CALLER, FAILURE, u(_msg).format(email_address))
+            self._runner.log(_caller, FAILURE, u(_msg).format(email_address))
     #/update_email
 
 #/Email
@@ -455,13 +464,14 @@ class Domain(object):
                       domain=BLANK_STR,
                       subdomain=[]):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        
-        _arguments = get_arguments(self.create_domain, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _subdomains = _arguments.pop(-1)
+        
         for _subdomain in _subdomains:
             _arguments.append(_subdomain)
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.create_domain,
                                   _arguments)
     #/create_domain
@@ -471,13 +481,14 @@ class Domain(object):
                       domain=BLANK_STR,
                       subdomain=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        
-        _arguments = get_arguments(self.delete_domain, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _subdomains = _arguments.pop(-1)
+        
         for _subdomain in _subdomains:
             _arguments.append(_subdomain)
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.delete_domain,
                                   _arguments)
     #/delete_domain
@@ -511,18 +522,19 @@ class Website(object):
                        subdomains=[],
                        site_apps=[]):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create website '{}' that already exists."
         _existing_websites = self.list_websites()
         _website_name = {u('website_name'): website_name}
         
         if not already_exists(_website_name, _existing_websites):
-            _arguments = get_arguments(self.create_website, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_website,
                                       _arguments)
         else: #_website_name already in _existing_websites
-            self._runner.log(CALLER, FAILURE, u(_msg).format(website_name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(website_name))
     #/create_website
     
     
@@ -531,18 +543,19 @@ class Website(object):
                        ip=BLANK_STR,
                        https=False):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' website."
         _existing_websites = self.list_websites()
         _website_name = {u('website_name'): website_name}
         
         if already_exists(_website_name, _existing_websites):
-            _arguments = get_arguments(self.delete_website, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_website,
                                       _arguments)
         else: #_website_name not already in _existing_websites
-            self._runner.log(CALLER, FAILURE, u(_msg).format(website_name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(website_name))
     #/delete_website
     
     
@@ -553,18 +566,19 @@ class Website(object):
                        subdomains=[],
                        site_apps=[]):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't update non-existent '{}' website."
         _existing_websites = self.list_websites()
         _website_name = {u('website_name'): website_name}
         
         if already_exists(_website_name, _existing_websites):
-            _arguments = get_arguments(self.update_website, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.update_website,
                                       _arguments)
         else: #_website_name not already in _existing_websites
-            self._runner.log(CALLER, FAILURE, u(_msg).format(website_name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(website_name))
     #/update_website
 
 #/Website
@@ -596,36 +610,38 @@ class Application(object):
                    extra_info=BLANK_STR,
                    open_port=False):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create application '{}' that already exists."
         _existing_apps = self.list_apps()
         _app_name = {u('name'): name}
         
         if not already_exists(_app_name, _existing_apps):
-            _arguments = get_arguments(self.create_app, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_app,
                                       _arguments)
         else: #_app_name already in _existing_apps
-            self._runner.log(CALLER, FAILURE, u(_msg).format(name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(name))
     #/create_app
     
     
     def delete_app(self,
                    name=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' application."
         _existing_apps = self.list_apps()
         _app_name = {u('name'): name}
         
         if already_exists(_app_name, _existing_apps):
-            _arguments = get_arguments(self.delete_app, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_app,
                                       _arguments)
         else: #_app_name not already in _existing_apps
-            self._runner.log(CALLER, FAILURE, u(_msg).format(name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(name))
     #/delete_app
 
 #/Application
@@ -643,10 +659,11 @@ class Cron(object):
     def create_cronjob(self,
                         line=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        _arguments = get_arguments(self.create_cronjob, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.create_cronjob,
                                   _arguments)
     #/create_cronjob
@@ -655,10 +672,11 @@ class Cron(object):
     def delete_cronjob(self,
                         line=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        _arguments = get_arguments(self.delete_cronjob, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.delete_cronjob,
                                   _arguments)
     #/delete_cronjob
@@ -689,10 +707,11 @@ class DNS(object):
                             spf_record=BLANK_STR,
                             aaaa_ip=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        _arguments = get_arguments(self.create_dns_override, locals())
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.create_dns_override,
                                   _arguments)
     #/create_dns_override
@@ -707,10 +726,11 @@ class DNS(object):
                             spf_record=BLANK_STR,
                             aaaa_ip=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        _arguments = get_arguments(self.delete_dns_override, locals())
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.delete_dns_override,
                                   _arguments)
     #/delete_dns_override
@@ -742,18 +762,19 @@ class Database(object):
                   db_type=u("postgresql"),
                   password=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create database '{}' that already exists."
         _existing_databases = self.list_dbs()
         _db_name = {u('name'): name}
         
         if not already_exists(_db_name, _existing_databases):
-            _arguments = get_arguments(self.create_db, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_db,
                                       _arguments)
         else: #_db_name already in _existing_databases
-            self._runner.log(CALLER, FAILURE, u(_msg).format(name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(name))
     #/create_db
     
     
@@ -761,18 +782,19 @@ class Database(object):
                   name=BLANK_STR,
                   db_type=u("postgresql")):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' database."
         _existing_databases = self.list_dbs()
         _db_name = {u('name'): name}
         
         if already_exists(_db_name, _existing_databases):
-            _arguments = get_arguments(self.delete_db, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_db,
                                       _arguments)
         else: #_db_name not already in _existing_databases
-            self._runner.log(CALLER, FAILURE, u(_msg).format(name))
+            self._runner.log(_caller, FAILURE, u(_msg).format(name))
     #/delete_db
     
     
@@ -781,18 +803,19 @@ class Database(object):
                        password=BLANK_STR,
                        db_type=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create database user '{}' that already exists."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
         
         if not already_exists(_db_user, _existing_database_users):
-            _arguments = get_arguments(self.create_db_user, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_db_user,
                                       _arguments)
         else: #_db_user already in _existing_database_users
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/create_db_user
     
     
@@ -800,18 +823,19 @@ class Database(object):
                        username=BLANK_STR,
                        db_type=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
         
         if already_exists(_db_user, _existing_database_users):
-            _arguments = get_arguments(self.delete_db_user, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_db_user,
                                       _arguments)
         else: #_db_user already in _existing_database_users
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/delete_db_user
     
     
@@ -820,18 +844,19 @@ class Database(object):
                                 password=BLANK_STR,
                                 db_type=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't change password for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
         
         if already_exists(_db_user, _existing_database_users):
-            _arguments = get_arguments(self.change_db_user_password, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.change_db_user_password,
                                       _arguments)
         else: #_db_user not already in _existing_database_users
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/change_db_user_password
     
     
@@ -840,18 +865,19 @@ class Database(object):
                               database=BLANK_STR,
                               db_type=u("postgresql")):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't change password for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
         
         if already_exists(_db_user, _existing_database_users):
-            _arguments = get_arguments(self.make_user_owner_of_db, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.make_user_owner_of_db,
                                       _arguments)
         else: #_db_user not already in _existing_database_users
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/make_user_owner_of_db
     
     
@@ -860,18 +886,19 @@ class Database(object):
                              database=BLANK_STR,
                              db_type=u("postgresql")):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't grant permission for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
         
         if already_exists(_db_user, _existing_database_users):
-            _arguments = get_arguments(self.grant_db_permissions, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.grant_db_permissions,
                                       _arguments)
         else: #_db_user not already in _existing_database_users
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/grant_db_permissions
     
     
@@ -880,18 +907,19 @@ class Database(object):
                               database=BLANK_STR,
                               db_type=u("postgresql")):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't revoke permission for non-existent '{}' database user."
         _existing_database_users = self.list_db_users()
         _db_user = {u('username'): username}
         
         if already_exists(_db_user, _existing_database_users):
-            _arguments = get_arguments(self.revoke_db_permissions, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.revoke_db_permissions,
                                       _arguments)
         else: #_db_user not already in _existing_database_users
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/revoke_db_permissions
     
     
@@ -900,18 +928,19 @@ class Database(object):
                      db_type=u("postgresql"),
                      addon=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't enable addon for non-existent '{}' database."
         _existing_databases = self.list_dbs()
         _database = {u('database'): database}
         
         if already_exists(_database, _existing_databases):
-            _arguments = get_arguments(self.enable_addon, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.enable_addon,
                                       _arguments)
         else: #_database not already in _existing_databases
-            self._runner.log(CALLER, FAILURE, u(_msg).format(database))
+            self._runner.log(_caller, FAILURE, u(_msg).format(database))
     #/enable_addon
     
 #/Database
@@ -930,10 +959,11 @@ class File(object):
                         filename=BLANK_STR,
                         changes=[]):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        _arguments = get_arguments(self.replace_in_file, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.replace_in_file,
                                   _arguments)
     #/replace_in_file
@@ -944,10 +974,11 @@ class File(object):
                    str=BLANK_STR,
                    mode=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        _arguments = get_arguments(self.write_file, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.write_file,
                                   _arguments)
     #/write_file
@@ -974,36 +1005,38 @@ class ShellUser(object):
                     shell=BLANK_STR,
                     groups=[]):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't create already existing '{}' shell user."
         _existing_shellusers = self.list_users()
         _shell_user = {u('username'): username}
         
         if not already_exists(_shell_user, _existing_shellusers):
-            _arguments = get_arguments(self.create_user, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.create_user,
                                       _arguments)
         else: #_shell_user already in _existing_shellusers
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/create_user
     
     
     def delete_user(self,
                     username=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't delete non-existent '{}' shell user."
         _existing_shellusers = self.list_users()
         _shell_user = {u('username'): username}
         
         if already_exists(_shell_user, _existing_shellusers):
-            _arguments = get_arguments(self.delete_user, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.delete_user,
                                       _arguments)
         else: #_shell_user not already in _existing_shellusers
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/delete_user
     
     
@@ -1011,18 +1044,19 @@ class ShellUser(object):
                              username=BLANK_STR,
                              password=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         _msg = "Can't change password for non-existent '{}' shell user."
         _existing_shellusers = self.list_users()
         _shell_user = {u('username'): username}
         
         if already_exists(_shell_user, _existing_shellusers):
-            _arguments = get_arguments(self.change_user_password, locals())
-            self._runner.try_api_call(CALLER,
+            self._runner.try_api_call(_caller,
                                       self._server.change_user_password,
                                       _arguments)
         else: #_shell_user not already in _existing_shellusers
-            self._runner.log(CALLER, FAILURE, u(_msg).format(username))
+            self._runner.log(_caller, FAILURE, u(_msg).format(username))
     #/change_user_password
 
 #/ShellUser
@@ -1061,10 +1095,11 @@ class System(object):
     def system(self,
                cmd=BLANK_STR):
         
-        CALLER = get_frame_name(inspect.currentframe())
-        _arguments = get_arguments(self.system, locals())
+        _current_frame = inspect.currentframe()
+        _caller = get_frame_name(_current_frame)
+        _arguments = get_arguments(_current_frame)
         
-        self._runner.try_api_call(CALLER,
+        self._runner.try_api_call(_caller,
                                   self._server.system,
                                   _arguments)
     #/system
@@ -1163,10 +1198,10 @@ class Runner(object):
                     if isinstance(result, dict) or isinstance(result, list):
                         _list = list(flatten_iterable(result))
                         _string = concatenate_list_to_string(_list)
-                    elif isinstance(result, text_type):
+                    elif (isinstance(result, text_type) and result != BLANK_STR):
                         _string = result
                     else:
-                        _string = enquote(u("Unknown!"))
+                        _string = enquote(u("API returns empty result for this type of call."))
                     
                     _li += _string
                 _html += u("<li class='") + result_type + u("'>") + _li + u("</li>")
