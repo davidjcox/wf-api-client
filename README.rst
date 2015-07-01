@@ -35,19 +35,22 @@ commands.  Excellent!
 
 However, despite its excellence, there are a few design decisions that cause 
 misgivings for me:
+
 - The WebFaction API uses positional arguments.  
     When working with remote servers, I prefer commands to be as explicit as 
     possible, because like Unix, APIs can be unforgiving.  This client uses 
     keyword arguments to guard against a slip of concentration wiping something 
     important out.  It translates the keyword arguments into positional ones 
     for each API call.
+
 - The WebFaction API has small inconsistencies in calling convention.
     This is a nitpick, but one that's important when remotely administering 
     servers.  Some API calls define collections using lists.  Others define 
     collections using positional arguments only.  Once again, a mistake waiting 
     to be made if a call signature is recalled incorrectly.  This client uses 
-    lists for all collections and unwraps the appropriate ones back into 
-    individual positional arguments for those API calls that require it.
+    lists for all collections and unwraps them back into individual positional 
+    arguments for those API calls that require it.
+
 In addition to these translation functions, the WebFaction API client provides 
 additional utility similar to other IT automation solutions like Ansible, Salt, 
 etc, by providing batching, parallelism, and reporting, described as follows.
@@ -110,25 +113,14 @@ Tests are executed like so::
     python wfapiclienttests.py "username" "password" "/path/to/report.html"
 
 
-Scripts for importation by the module call methods directly using Python syntax.
-The run report is automatically generated using a supplied destination file name.
-Imported scripts are structured like this::
-
-    """`create_emails` script"""
-    
-    #Class object creation requires `self` reference to Runner().
-    email = Email(self)
-    email.create_emails(domain="example.com", targets="user@example.com")
-    
-    #EOF - `create_emails`
-
-
 Standalone scripts import the module as a library and are responsible for 
 instantiating the Runner class to log results and write out the run report.  It 
 is more flexible in that multiple runner objects can be created to work on 
 different servers at one time logging either to separate reports or to one 
 shared report.
-Standalone scripts are structured like this::
+Standalone scripts are structured like this:
+
+.. code:: python
 
     """`create_emails` script"""
     
@@ -164,6 +156,21 @@ Direct module calls are invoked like this::
     python wfapiclient.py "username" "password" \
                             --scriptfile=/home/user/scripts/create_emails \
                             --reportfile=/tmp/create_emails.html
+
+
+Scripts for importation by the module call methods directly using Python syntax.
+The run report is automatically generated using a supplied destination file name.
+Imported scripts are structured like this:
+
+.. code:: python
+
+    """`create_emails` script"""
+    
+    #Class object creation requires `self` reference to Runner().
+    email = Email(self)
+    email.create_emails(domain="example.com", targets="user@example.com")
+    
+    #EOF - `create_emails`
 
 
 That's it.  Have fun.
