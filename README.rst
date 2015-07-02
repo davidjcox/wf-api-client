@@ -15,7 +15,7 @@ Detailed documentation is available on http://wf-api-client.readthedocs.org/en/l
 
 :Contact:   <davidjcox.at@gmail.com>
 
-:Version:   1.0
+:Version:   1.0.1
 
 Let me know what you think of it...
 

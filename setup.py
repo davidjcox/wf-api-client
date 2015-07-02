@@ -16,7 +16,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='wf-api-client',
-    version='0.3',
+    version='1.0.1',
     packages=find_packages(),
     include_package_data=True,
     license='BSD License',
@@ -27,7 +27,7 @@ setup(
     author_email='davidjcox.at@gmail.com',
     classifiers=[
         'Environment :: Console',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Information Technology',

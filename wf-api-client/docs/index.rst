@@ -28,49 +28,7 @@ Detailed documentation is available on http://wf-api-client.readthedocs.org/en/l
 
 :Contact:   <davidjcox.at@gmail.com>
 
-:Version:   1.0
-
-Let me know what you think of it...
-
-=============
-wf-api-client
-=============
-
-The WebFaction API client is a local client for interfacing to the WebFaction 
-web hosting server API.  It provides class-based organization, convenience 
-methods, script execution, and HTML-formatted run reporting.
-
-It can be used as standalone module to execute a supplied script file or as an 
-imported library module within individual script files.
-
-Detailed documentation is available on http://wf-api-client.readthedocs.org/en/latest/.
-
-:Author:    David J Cox
-
-:Contact:   <davidjcox.at@gmail.com>
-
-:Version:   1.0
-
-Let me know what you think of it...
-
-=============
-wf-api-client
-=============
-
-The WebFaction API client is a local client for interfacing to the WebFaction 
-web hosting server API.  It provides class-based organization, convenience 
-methods, script execution, and HTML-formatted run reporting.
-
-It can be used as standalone module to execute a supplied script file or as an 
-imported library module within individual script files.
-
-Detailed documentation is available on http://wf-api-client.readthedocs.org/en/latest/.
-
-:Author:    David J Cox
-
-:Contact:   <davidjcox.at@gmail.com>
-
-:Version:   1.0
+:Version:   1.0.1
 
 Let me know what you think of it...
 
